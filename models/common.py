@@ -73,18 +73,30 @@ def autopad(k, p=None, d=1):
 class WinogradConv2D(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=True):
         super(WinogradConv2D, self).__init__()
+        
+        # Required attributes
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = (kernel_size, kernel_size)
         self.stride = (stride, stride)
         self.padding = (padding, padding)
-        self.bias_flag = bias  # Optional: used for info/debug
+        self.dilation = (1, 1)
+        self.groups = 1
+        self.bias_flag = bias
 
+        # Weights and bias
         self.weight = nn.Parameter(torch.randn(out_channels, in_channels, kernel_size, kernel_size))
         self.bias = nn.Parameter(torch.randn(out_channels)) if bias else None
 
     def forward(self, x):
-        return F.conv2d(x, self.weight, self.bias, stride=self.stride, padding=self.padding)
+        return F.conv2d(x, self.weight, self.bias, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=self.groups)
+
+    def fuseforward(self, x):
+        return self.forward(x)
+
+    def fuse(self):
+        return self
+
 
 
 
