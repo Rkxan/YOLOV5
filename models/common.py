@@ -192,17 +192,27 @@ class WinogradConv2D(nn.Module):
         return self
 
 class Conv(nn.Module):
-    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True, use_winograd=False):
+    """Applies a convolution, batch normalization, and activation function to an input tensor in a neural network."""
+
+    default_act = nn.SiLU()  # default activation
+
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
+        """Initializes a standard convolution layer with optional batch normalization and activation."""
         super().__init__()
-        if use_winograd and k == 3 and s == 1:  # Winograd best suited for 3x3 stride 1
-            self.conv = WinogradConv2D(c1, c2, kernel_size=k, stride=s, padding=autopad(k, p))
+        if k == 3 and s == 1 and g == 1:
+            self.conv = WinogradConv2D(c1, c2, kernel_size=k, stride=s, padding=autopad(k, p), bias=False)
         else:
             self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False)
         self.bn = nn.BatchNorm2d(c2)
-        self.act = nn.SiLU() if act else nn.Identity()
+        self.act = self.default_act if act is True else act if isinstance(act, nn.Module) else nn.Identity()
 
     def forward(self, x):
+        """Applies a convolution followed by batch normalization and an activation function to the input tensor `x`."""
         return self.act(self.bn(self.conv(x)))
+
+    def forward_fuse(self, x):
+        """Applies a fused convolution and activation function to the input tensor `x`."""
+        return self.act(self.conv(x))
 
 class DWConv(Conv):
     """Implements a depth-wise convolution layer with optional activation for efficient spatial filtering."""
