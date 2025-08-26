@@ -97,6 +97,7 @@ class WinogradConv2D(nn.Module):
         self.stride       = (1, 1)
         self.dilation     = (1, 1)
         self.groups       = 1
+        self.is_winograd = True            
 
 
         # learnable weight & bias
@@ -129,6 +130,11 @@ class WinogradConv2D(nn.Module):
         self.register_buffer('At', At)
 
     def forward(self, x):
+         Bt = self.Bt.to(dtype=x.dtype, device=x.device)
+         G  = self.G.to(dtype=x.dtype,  device=x.device)
+         At = self.At.to(dtype=x.dtype, device=x.device)
+
+        
         B, C, H, W = x.shape
         assert C == self.in_channels
 
