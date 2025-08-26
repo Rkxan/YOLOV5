@@ -187,15 +187,26 @@ class BaseModel(nn.Module):
             LOGGER.info(f"{sum(dt):10.2f} {'-':>10s} {'-':>10s}  Total")
 
     def fuse(self):
-        """Fuses Conv2d() and BatchNorm2d() layers in the model to improve inference speed."""
-        LOGGER.info("Fusing layers... ")
-        for m in self.model.modules():
-            if isinstance(m, (Conv, DWConv)) and hasattr(m, "bn"):
-                m.conv = fuse_conv_and_bn(m.conv, m.bn)  # update conv
-                delattr(m, "bn")  # remove batchnorm
-                m.forward = m.forward_fuse  # update forward
-        self.info()
-        return self
+    """Fuses Conv+BN where safe. Keeps WinogradConv2D layers intact."""
+    LOGGER.info("Fusing layers... ")
+    import torch.nn as nn
+    from utils.torch_utils import fuse_conv_and_bn
+
+    for m in self.model.modules():
+        # Only blocks that have .conv and .bn (i.e., Conv/DWConv wrappers)
+        if hasattr(m, "bn") and hasattr(m, "conv") and isinstance(m.bn, nn.BatchNorm2d):
+            # ⛔ Skip Winograd: keep BN+Winograd as-is so inference still uses Winograd
+            if getattr(m.conv, "is_winograd", False):
+                continue
+            # ✅ Safe to fuse standard Conv2d
+            if isinstance(m.conv, nn.Conv2d):
+                m.conv = fuse_conv_and_bn(m.conv, m.bn)
+                delattr(m, "bn")
+                if hasattr(m, "forward_fuse"):
+                    m.forward = m.forward_fuse
+    self.info()
+    return self
+
 
     def info(self, verbose=False, img_size=640):
         """Prints model information given verbosity and image size, e.g., `info(verbose=True, img_size=640)`."""
